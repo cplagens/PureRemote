@@ -5,7 +5,7 @@ package app.pureremote
  * Gibt es gar keinen Eintrag, zeigt die App keinen Unterstützen-Bereich an.
  */
 object SupportLinks {
-    const val SOURCE_CODE = "https://github.com/gem-cp/PureRemote"
+    const val SOURCE_CODE = "https://github.com/cplagens/PureRemote"
 
     const val KOFI = ""             // z. B. "https://ko-fi.com/deinname"
     const val PAYPAL = "https://paypal.me/ChristianPlagens"           // z. B. "https://paypal.me/name"
