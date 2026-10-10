@@ -10,6 +10,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -49,26 +51,28 @@ fun App(vm: RemoteVM) {
 fun Devices(vm: RemoteVM) {
     val devices by vm.devices.collectAsStateWithLifecycle()
     var manualIp by remember { mutableStateOf("") }
-    Text("Chromecast mit Google TV", style = MaterialTheme.typography.headlineSmall)
-    Text("Geräte im WLAN:", Modifier.padding(top = 12.dp, bottom = 4.dp))
-    if (devices.isEmpty()) Text("Suche läuft …", color = MaterialTheme.colorScheme.outline)
-    LazyColumn(Modifier.weight(1f)) {
-        items(devices) { d ->
-            ListItem(
-                headlineContent = { Text(d.name) },
-                supportingContent = { Text(d.host) },
-                modifier = Modifier.clickable { vm.select(d.host, d.name) }
-            )
-            HorizontalDivider()
+    Column(Modifier.fillMaxSize()) {
+        Text("Chromecast mit Google TV", style = MaterialTheme.typography.headlineSmall)
+        Text("Geräte im WLAN:", Modifier.padding(top = 12.dp, bottom = 4.dp))
+        if (devices.isEmpty()) Text("Suche läuft …", color = MaterialTheme.colorScheme.outline)
+        LazyColumn(Modifier.weight(1f)) {
+            items(devices) { d ->
+                ListItem(
+                    headlineContent = { Text(d.name) },
+                    supportingContent = { Text(d.host) },
+                    modifier = Modifier.clickable { vm.select(d.host, d.name) }
+                )
+                HorizontalDivider()
+            }
         }
-    }
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        OutlinedTextField(
-            manualIp, { manualIp = it }, label = { Text("IP manuell (z. B. 192.168.1.50)") },
-            singleLine = true, modifier = Modifier.weight(1f)
-        )
-        Spacer(Modifier.width(8.dp))
-        Button(onClick = { vm.select(manualIp.trim(), manualIp.trim()) }, enabled = manualIp.isNotBlank()) { Text("Los") }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(
+                manualIp, { manualIp = it }, label = { Text("IP manuell (z. B. 192.168.1.50)") },
+                singleLine = true, modifier = Modifier.weight(1f)
+            )
+            Spacer(Modifier.width(8.dp))
+            Button(onClick = { vm.select(manualIp.trim(), manualIp.trim()) }, enabled = manualIp.isNotBlank()) { Text("Los") }
+        }
     }
 }
 
@@ -114,9 +118,9 @@ fun RemotePad(vm: RemoteVM, s: Screen.Remote) {
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         IconBtn(Icons.Default.KeyboardArrowUp, "Hoch", Keys.UP)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconBtn(Icons.Default.KeyboardArrowLeft, "Links", Keys.LEFT)
+            IconBtn(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Links", Keys.LEFT)
             Btn("OK", Keys.CENTER, Modifier.size(88.dp))
-            IconBtn(Icons.Default.KeyboardArrowRight, "Rechts", Keys.RIGHT)
+            IconBtn(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Rechts", Keys.RIGHT)
         }
         IconBtn(Icons.Default.KeyboardArrowDown, "Runter", Keys.DOWN)
         Spacer(Modifier.height(16.dp))
