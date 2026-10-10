@@ -8,8 +8,8 @@ object SupportLinks {
     const val SOURCE_CODE = "https://github.com/gem-cp/PureRemote"
 
     const val KOFI = ""             // z. B. "https://ko-fi.com/deinname"
-    const val PAYPAL = ""           // z. B. "https://paypal.me/deinname"
-    const val GITHUB_SPONSORS = ""  // z. B. "https://github.com/sponsors/gem-cp"
+    const val PAYPAL = "https://paypal.me/ChristianPlagens"           // z. B. "https://paypal.me/name"
+    const val GITHUB_SPONSORS = "https://github.com/sponsors/cplagens"  // z. B. "https://github.com/sponsors/cplagens"
 
     val donationOptions: List<Pair<String, String>>
         get() = listOf(
