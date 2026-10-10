@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -18,7 +19,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pureremote.net.Keys
@@ -51,8 +55,15 @@ fun App(vm: RemoteVM) {
 fun Devices(vm: RemoteVM) {
     val devices by vm.devices.collectAsStateWithLifecycle()
     var manualIp by remember { mutableStateOf("") }
+    var showAbout by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize()) {
-        Text("Chromecast mit Google TV", style = MaterialTheme.typography.headlineSmall)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Image(painterResource(R.drawable.ic_logo), contentDescription = null, modifier = Modifier.size(36.dp))
+            Spacer(Modifier.width(12.dp))
+            Text("PureRemote", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
+            IconButton(onClick = { showAbout = true }) { Icon(Icons.Default.Info, contentDescription = "Über PureRemote") }
+        }
+        if (showAbout) AboutDialog { showAbout = false }
         Text("Geräte im WLAN:", Modifier.padding(top = 12.dp, bottom = 4.dp))
         if (devices.isEmpty()) Text("Suche läuft …", color = MaterialTheme.colorScheme.outline)
         LazyColumn(Modifier.weight(1f)) {
@@ -140,4 +151,38 @@ fun RemotePad(vm: RemoteVM, s: Screen.Remote) {
             Btn("Vol +", Keys.VOL_UP)
         }
     }
+}
+
+@Composable
+fun AboutDialog(onDismiss: () -> Unit) {
+    val uri = LocalUriHandler.current
+    val ctx = LocalContext.current
+    val version = remember {
+        runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull().orEmpty()
+    }
+    val options = SupportLinks.donationOptions
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Schließen") } },
+        icon = { Image(painterResource(R.drawable.ic_logo), contentDescription = null, modifier = Modifier.size(64.dp)) },
+        title = { Text("PureRemote") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (version.isNotEmpty()) Text("Version $version", style = MaterialTheme.typography.bodySmall)
+                Text("Kostenlos, ohne Werbung und ohne Tracking. Steuert deinen Chromecast mit Google TV direkt im WLAN.")
+                if (options.isNotEmpty()) {
+                    HorizontalDivider()
+                    Text("Wenn dir die App gefällt, freue ich mich über eine freiwillige Unterstützung. Sie ist nie nötig und schaltet nichts frei.")
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        options.forEach { (name, url) ->
+                            FilledTonalButton(onClick = { uri.openUri(url) }) { Text(name) }
+                        }
+                    }
+                }
+                TextButton(onClick = { uri.openUri(SupportLinks.SOURCE_CODE) }, contentPadding = PaddingValues(0.dp)) {
+                    Text("Quellcode auf GitHub")
+                }
+            }
+        }
+    )
 }

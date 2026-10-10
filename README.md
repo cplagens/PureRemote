@@ -20,3 +20,7 @@ Android-Fernbedienung für Chromecast mit Google TV (Android TV Remote Protocol 
 - `RemoteVM.kt` und `MainActivity.kt`: Zustand und Compose-UI
 
 Hinweis: Das Protokoll ist nicht offiziell dokumentiert und kann sich mit Firmware-Updates ändern.
+
+## Unterstützen
+PureRemote ist und bleibt kostenlos, ohne Werbung und ohne Tracking. Wer möchte, kann die Entwicklung freiwillig unterstützen.
+Die Links werden in `app/src/main/java/app/pureremote/SupportLinks.kt` eingetragen; leere Einträge werden in der App ausgeblendet.
