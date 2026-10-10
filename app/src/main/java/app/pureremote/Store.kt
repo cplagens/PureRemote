@@ -19,6 +19,11 @@ class Store(ctx: Context) {
         get() = p.getString("last_host", null)
         set(v) { p.edit().putString("last_host", v).apply() }
 
+    /** Wurde die Sprachauswahl beim ersten Start schon abgeschlossen? */
+    var welcomeDone: Boolean
+        get() = p.getBoolean("welcome_done", false)
+        set(v) { p.edit().putBoolean("welcome_done", v).apply() }
+
     var volumeKeys: Boolean
         get() = p.getBoolean("volume_keys", true)
         set(v) { p.edit().putBoolean("volume_keys", v).apply() }

@@ -11,12 +11,14 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
@@ -82,26 +84,27 @@ private fun RemoteKey(vm: RemoteVM, code: Int, desc: String, size: Dp, repeat: B
 fun RemotePad(vm: RemoteVM, s: Screen.Remote) {
     val connected by vm.client.connected.collectAsStateWithLifecycle()
     val power by vm.client.power.collectAsStateWithLifecycle()
-    val volumeKeys by vm.volumeKeys.collectAsStateWithLifecycle()
     val haptic = LocalHapticFeedback.current
     var showApps by remember { mutableStateOf(false) }
     var showText by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
+    var showSettings by rememberSaveable { mutableStateOf(false) }
 
     val (statusText, statusColor) = when {
-        !connected -> "Nicht erreichbar – verbinde neu …" to MaterialTheme.colorScheme.error
-        power == PowerState.ON -> "An" to Color(0xFF2E7D32)
-        power == PowerState.STANDBY -> "Standby" to Color(0xFFF9A825)
-        else -> "Verbunden" to MaterialTheme.colorScheme.outline
+        !connected -> stringResource(R.string.status_offline) to MaterialTheme.colorScheme.error
+        power == PowerState.ON -> stringResource(R.string.status_on) to Color(0xFF2E7D32)
+        power == PowerState.STANDBY -> stringResource(R.string.status_standby) to Color(0xFFF9A825)
+        else -> stringResource(R.string.status_connected) to MaterialTheme.colorScheme.outline
     }
     val powerLabel = when {
-        connected && power == PowerState.ON -> "⏻ Ausschalten"
-        connected && power == PowerState.STANDBY -> "⏻ Einschalten"
-        else -> "⏻ Power"
+        connected && power == PowerState.ON -> stringResource(R.string.power_off)
+        connected && power == PowerState.STANDBY -> stringResource(R.string.power_on)
+        else -> stringResource(R.string.power_generic)
     }
 
     if (showApps) AppsDialog(vm) { showApps = false }
     if (showText) TextDialog(vm) { showText = false }
+    if (showSettings) SettingsDialog(vm) { showSettings = false }
 
     Column(Modifier.fillMaxSize()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -118,14 +121,14 @@ fun RemotePad(vm: RemoteVM, s: Screen.Remote) {
                 vm.togglePower()
             }) { Text(powerLabel) }
             Box {
-                IconButton(onClick = { menuOpen = true }) { Icon(Icons.Default.MoreVert, contentDescription = "Mehr") }
+                IconButton(onClick = { menuOpen = true }) { Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.more)) }
                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                     DropdownMenuItem(
-                        text = { Text(if (volumeKeys) "Handy-Lautstärketasten: an" else "Handy-Lautstärketasten: aus") },
-                        onClick = { vm.setVolumeKeys(!volumeKeys); menuOpen = false }
+                        text = { Text(stringResource(R.string.settings)) },
+                        onClick = { menuOpen = false; showSettings = true }
                     )
                     DropdownMenuItem(
-                        text = { Text("Gerät wechseln") },
+                        text = { Text(stringResource(R.string.switch_device)) },
                         onClick = { menuOpen = false; vm.disconnect() }
                     )
                 }
@@ -142,33 +145,33 @@ fun RemotePad(vm: RemoteVM, s: Screen.Remote) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically)
             ) {
-                RemoteKey(vm, Keys.UP, "Hoch", d, repeat = true) { Icon(Icons.Default.KeyboardArrowUp, null, Modifier.size(32.dp)) }
+                RemoteKey(vm, Keys.UP, stringResource(R.string.key_up), d, repeat = true) { Icon(Icons.Default.KeyboardArrowUp, null, Modifier.size(32.dp)) }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    RemoteKey(vm, Keys.LEFT, "Links", d, repeat = true) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, null, Modifier.size(32.dp)) }
+                    RemoteKey(vm, Keys.LEFT, stringResource(R.string.key_left), d, repeat = true) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, null, Modifier.size(32.dp)) }
                     RemoteKey(vm, Keys.CENTER, "OK", ok) { Text("OK", style = MaterialTheme.typography.titleMedium) }
-                    RemoteKey(vm, Keys.RIGHT, "Rechts", d, repeat = true) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, Modifier.size(32.dp)) }
+                    RemoteKey(vm, Keys.RIGHT, stringResource(R.string.key_right), d, repeat = true) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, Modifier.size(32.dp)) }
                 }
-                RemoteKey(vm, Keys.DOWN, "Runter", d, repeat = true) { Icon(Icons.Default.KeyboardArrowDown, null, Modifier.size(32.dp)) }
+                RemoteKey(vm, Keys.DOWN, stringResource(R.string.key_down), d, repeat = true) { Icon(Icons.Default.KeyboardArrowDown, null, Modifier.size(32.dp)) }
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    RemoteKey(vm, Keys.BACK, "Zurück", d) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, Modifier.size(32.dp)) }
-                    RemoteKey(vm, Keys.HOME, "Home", d) { Icon(Icons.Default.Home, null, Modifier.size(32.dp)) }
-                    RemoteKey(vm, Keys.MENU, "Menü", d) { Icon(Icons.Default.Menu, null, Modifier.size(32.dp)) }
+                    RemoteKey(vm, Keys.BACK, stringResource(R.string.key_back), d) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, Modifier.size(32.dp)) }
+                    RemoteKey(vm, Keys.HOME, stringResource(R.string.key_home), d) { Icon(Icons.Default.Home, null, Modifier.size(32.dp)) }
+                    RemoteKey(vm, Keys.MENU, stringResource(R.string.key_menu), d) { Icon(Icons.Default.Menu, null, Modifier.size(32.dp)) }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    RemoteKey(vm, Keys.REWIND, "Zurückspulen", d) { Text("⏪") }
-                    RemoteKey(vm, Keys.PLAY_PAUSE, "Wiedergabe oder Pause", d) { Icon(Icons.Default.PlayArrow, null, Modifier.size(32.dp)) }
-                    RemoteKey(vm, Keys.FORWARD, "Vorspulen", d) { Text("⏩") }
+                    RemoteKey(vm, Keys.REWIND, stringResource(R.string.key_rewind), d) { Text("⏪") }
+                    RemoteKey(vm, Keys.PLAY_PAUSE, stringResource(R.string.key_play_pause), d) { Icon(Icons.Default.PlayArrow, null, Modifier.size(32.dp)) }
+                    RemoteKey(vm, Keys.FORWARD, stringResource(R.string.key_forward), d) { Text("⏩") }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    RemoteKey(vm, Keys.VOL_DOWN, "Leiser", d, repeat = true) { Text("Vol −") }
-                    RemoteKey(vm, Keys.MUTE, "Stumm", d) { Text("Mute") }
-                    RemoteKey(vm, Keys.VOL_UP, "Lauter", d, repeat = true) { Text("Vol +") }
+                    RemoteKey(vm, Keys.VOL_DOWN, stringResource(R.string.key_vol_down), d, repeat = true) { Text("Vol −") }
+                    RemoteKey(vm, Keys.MUTE, stringResource(R.string.key_mute), d) { Text("Mute") }
+                    RemoteKey(vm, Keys.VOL_UP, stringResource(R.string.key_vol_up), d, repeat = true) { Text("Vol +") }
                 }
                 Spacer(Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    FilledTonalButton(onClick = { showText = true }) { Text("⌨  Text") }
-                    FilledTonalButton(onClick = { showApps = true }) { Text("Apps") }
+                    FilledTonalButton(onClick = { showText = true }) { Text(stringResource(R.string.btn_text)) }
+                    FilledTonalButton(onClick = { showApps = true }) { Text(stringResource(R.string.btn_apps)) }
                 }
             }
         }

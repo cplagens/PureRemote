@@ -28,6 +28,11 @@ Hinweis: Das Protokoll ist nicht offiziell dokumentiert und kann sich mit Firmwa
 - Die Lautstärketasten des Handys steuern den Fernseher (im Menü abschaltbar).
 - Texteingabe vom Handy in Suchfelder des Fernsehers.
 - App-Schnellstart mit eigener, anpassbarer Liste.
+- Mehrsprachig: Englisch, Deutsch, Französisch, Spanisch, Italienisch, Portugiesisch, Niederländisch, Polnisch, Türkisch, Russisch, Japanisch, vereinfachtes Chinesisch. Auswahl beim ersten Start und in den Einstellungen.
+
+### Neue Sprache hinzufügen
+1. `app/src/main/res/values/strings.xml` nach `values-<code>/strings.xml` kopieren und übersetzen.
+2. Den Code in `Lang.kt` und in `res/xml/locales_config.xml` eintragen.
 
 ## Unterstützen
 PureRemote ist und bleibt kostenlos, ohne Werbung und ohne Tracking. Wer möchte, kann die Entwicklung freiwillig unterstützen.

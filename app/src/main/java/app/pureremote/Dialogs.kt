@@ -16,6 +16,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -31,24 +34,25 @@ fun TextDialog(vm: RemoteVM, onDismiss: () -> Unit) {
     fun send() { if (text.isNotEmpty()) { vm.sendText(text); text = "" } }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Text an den Fernseher") },
+        title = { Text(stringResource(R.string.text_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Wähle am Fernseher zuerst ein Textfeld aus, z. B. die Suche.", style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.text_hint), style = MaterialTheme.typography.bodySmall)
                 OutlinedTextField(
-                    value = text, onValueChange = { text = it }, label = { Text("Text") },
+                    value = text, onValueChange = { text = it }, label = { Text(stringResource(R.string.text_label)) },
                     singleLine = true, modifier = Modifier.fillMaxWidth().focusRequester(focus),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                     keyboardActions = KeyboardActions(onSend = { send() })
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilledTonalButton(onClick = { send() }, enabled = text.isNotEmpty()) { Text("Senden") }
-                    OutlinedButton(onClick = { vm.client.key(Keys.DEL) }) { Text("⌫") }
-                    OutlinedButton(onClick = { vm.client.key(Keys.ENTER) }) { Text("Enter") }
+                    FilledTonalButton(onClick = { send() }, enabled = text.isNotEmpty()) { Text(stringResource(R.string.send)) }
+                    val delDesc = stringResource(R.string.delete_char)
+                    OutlinedButton(onClick = { vm.client.key(Keys.DEL) }, modifier = Modifier.semantics { contentDescription = delDesc }) { Text("⌫") }
+                    OutlinedButton(onClick = { vm.client.key(Keys.ENTER) }) { Text(stringResource(R.string.enter)) }
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Fertig") } }
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.done)) } }
     )
 }
 
@@ -71,8 +75,8 @@ fun AppsDialog(vm: RemoteVM, onDismiss: () -> Unit) {
         onDismissRequest = onDismiss,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Apps", Modifier.weight(1f))
-                TextButton(onClick = { edit = !edit }) { Text(if (edit) "Fertig" else "Bearbeiten") }
+                Text(stringResource(R.string.apps_title), Modifier.weight(1f))
+                TextButton(onClick = { edit = !edit }) { Text(stringResource(if (edit) R.string.done else R.string.edit)) }
             }
         },
         text = {
@@ -83,9 +87,9 @@ fun AppsDialog(vm: RemoteVM, onDismiss: () -> Unit) {
                             @Composable {
                                 Row {
                                     IconButton(onClick = { vm.moveShortcutUp(i) }, enabled = i > 0) {
-                                        Icon(Icons.Default.KeyboardArrowUp, "Nach oben")
+                                        Icon(Icons.Default.KeyboardArrowUp, stringResource(R.string.move_up))
                                     }
-                                    IconButton(onClick = { vm.removeShortcut(i) }) { Icon(Icons.Default.Delete, "Entfernen") }
+                                    IconButton(onClick = { vm.removeShortcut(i) }) { Icon(Icons.Default.Delete, stringResource(R.string.remove)) }
                                 }
                             }
                         } else null
@@ -101,18 +105,14 @@ fun AppsDialog(vm: RemoteVM, onDismiss: () -> Unit) {
                 val cur = currentApp
                 if (cur != null && apps.none { it.target == cur.pkg }) {
                     FilledTonalButton(onClick = { vm.addShortcut(cur.label, cur.pkg) }) {
-                        Text("＋ Läuft gerade: ${cur.label}", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(stringResource(R.string.add_current, cur.label), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
-                TextButton(onClick = { adding = true }) { Text("App manuell hinzufügen") }
-                Text(
-                    "Tipp: Öffne eine App am Fernseher, dann kannst du sie hier mit einem Tipp zur Liste hinzufügen. " +
-                        "Die Reihenfolge deines Google-TV-Startbildschirms kann die App nicht auslesen.",
-                    style = MaterialTheme.typography.bodySmall
-                )
+                TextButton(onClick = { adding = true }) { Text(stringResource(R.string.add_manual)) }
+                Text(stringResource(R.string.apps_tip), style = MaterialTheme.typography.bodySmall)
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Schließen") } }
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) } }
     )
 }
 
@@ -122,20 +122,20 @@ fun AddAppDialog(onAdd: (String, String) -> Unit, onDismiss: () -> Unit) {
     var target by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("App hinzufügen") },
+        title = { Text(stringResource(R.string.add_app_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true)
+                OutlinedTextField(name, { name = it }, label = { Text(stringResource(R.string.name)) }, singleLine = true)
                 OutlinedTextField(
-                    target, { target = it }, label = { Text("Paketname oder Link") }, singleLine = true,
-                    supportingText = { Text("z. B. com.netflix.ninja oder https://www.youtube.com") }
+                    target, { target = it }, label = { Text(stringResource(R.string.target_label)) }, singleLine = true,
+                    supportingText = { Text(stringResource(R.string.target_hint)) }
                 )
             }
         },
         confirmButton = {
-            TextButton(onClick = { onAdd(name, target) }, enabled = name.isNotBlank() && target.isNotBlank()) { Text("Hinzufügen") }
+            TextButton(onClick = { onAdd(name, target) }, enabled = name.isNotBlank() && target.isNotBlank()) { Text(stringResource(R.string.add)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } }
     )
 }
 
@@ -145,19 +145,19 @@ fun RenameDialog(row: DeviceRow, onSave: (String) -> Unit, onForget: () -> Unit,
     var name by remember { mutableStateOf(row.name) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Fernseher") },
+        title = { Text(stringResource(R.string.tv_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true)
+                OutlinedTextField(name, { name = it }, label = { Text(stringResource(R.string.name)) }, singleLine = true)
                 Text(row.host, style = MaterialTheme.typography.bodySmall)
                 if (row.saved) {
                     TextButton(onClick = onForget, contentPadding = PaddingValues(0.dp)) {
-                        Text("Gerät vergessen (Kopplung entfernen)", color = MaterialTheme.colorScheme.error)
+                        Text(stringResource(R.string.forget), color = MaterialTheme.colorScheme.error)
                     }
                 }
             }
         },
-        confirmButton = { TextButton(onClick = { onSave(name) }, enabled = name.isNotBlank()) { Text("Speichern") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen") } }
+        confirmButton = { TextButton(onClick = { onSave(name) }, enabled = name.isNotBlank()) { Text(stringResource(R.string.save)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } }
     )
 }

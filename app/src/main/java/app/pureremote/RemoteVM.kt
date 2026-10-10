@@ -2,6 +2,7 @@ package app.pureremote
 
 import android.app.Application
 import android.view.KeyEvent
+import androidx.annotation.StringRes
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.pureremote.net.*
@@ -21,6 +22,9 @@ sealed interface Screen {
     data class Remote(val name: String, val host: String) : Screen
 }
 
+/** Ein übersetzbarer Hinweis für die Oberfläche (Text aus strings.xml, optional mit einem Platzhalter). */
+data class UiMsg(@StringRes val res: Int, val arg: String? = null)
+
 /** Eine Zeile der Geräteliste: gespeicherte und/oder aktuell im WLAN sichtbare Fernseher. */
 data class DeviceRow(val host: String, val name: String, val online: Boolean, val saved: Boolean)
 
@@ -37,7 +41,8 @@ class RemoteVM(app: Application) : AndroidViewModel(app) {
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val screen = MutableStateFlow<Screen>(Screen.Devices)
-    val error = MutableStateFlow<String?>(null)
+    val error = MutableStateFlow<UiMsg?>(null)
+    val firstStart = MutableStateFlow(!store.welcomeDone)
     val busy = MutableStateFlow(false)
     val connectingTo = MutableStateFlow<String?>(null)
     val shortcuts = MutableStateFlow(store.shortcuts())
@@ -52,6 +57,8 @@ class RemoteVM(app: Application) : AndroidViewModel(app) {
             select(target, savedDevices.value.firstOrNull { it.host == target }?.name ?: target)
         }
     }
+
+    fun finishWelcome() { store.welcomeDone = true; firstStart.value = false }
 
     // ---------------- Verbinden / Koppeln ----------------
 
@@ -69,7 +76,7 @@ class RemoteVM(app: Application) : AndroidViewModel(app) {
             throw e
         } catch (e: UnreachableException) {
             // Nur nicht erreichbar -> Kopplung bleibt erhalten
-            error.value = "$name ist nicht erreichbar. Ist der Fernseher an und im selben WLAN?"
+            error.value = UiMsg(R.string.err_unreachable, name)
         } catch (e: Exception) {
             // Kopplung evtl. am TV gelöscht -> neu koppeln
             store.setPaired(host, false)
@@ -85,7 +92,7 @@ class RemoteVM(app: Application) : AndroidViewModel(app) {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            error.value = "Verbindung fehlgeschlagen: ${e.message}"
+            error.value = UiMsg(R.string.err_connect, e.message ?: e.javaClass.simpleName)
         } finally { busy.value = false }
     }
 
@@ -100,7 +107,7 @@ class RemoteVM(app: Application) : AndroidViewModel(app) {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            error.value = e.message ?: "Fehler beim Koppeln"
+            error.value = UiMsg(if (e is WrongCodeException) R.string.err_wrong_code else R.string.err_pairing)
         } finally { busy.value = false }
     }
 

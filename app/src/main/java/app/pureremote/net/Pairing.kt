@@ -10,6 +10,9 @@ import java.security.MessageDigest
 import java.security.interfaces.RSAPublicKey
 import javax.net.ssl.SSLSocket
 
+/** Der eingegebene Code ist ungültig oder passt nicht zum Code auf dem Fernseher. */
+class WrongCodeException : Exception("wrong pairing code")
+
 /**
  * Pairing-Protokoll ("Polo") auf Port 6467:
  * Request -> Option -> Configuration -> TV zeigt 6-stelligen Hex-Code -> Secret (SHA-256).
@@ -25,7 +28,7 @@ class Pairing(private val ctx: Context) {
 
     private fun receive(): PbMsg {
         val m = PbMsg.parse(sock!!.inputStream.readFrame())
-        check(m.int(2) == 200) { "TV hat das Pairing abgelehnt (Status ${m.int(2)})" }
+        check(m.int(2) == 200) { "Pairing rejected by TV (status ${m.int(2)})" }
         return m
     }
 
@@ -51,7 +54,7 @@ class Pairing(private val ctx: Context) {
     /** Schließt das Pairing mit dem auf dem TV angezeigten Code ab. */
     suspend fun finish(code: String) = withContext(Dispatchers.IO) {
         val c = code.trim().uppercase()
-        require(c.length == 6 && c.all { it in "0123456789ABCDEF" }) { "Der Code besteht aus 6 Zeichen (0-9, A-F)." }
+        if (c.length != 6 || !c.all { it in "0123456789ABCDEF" }) throw WrongCodeException()
         val cb = ByteArray(3) { c.substring(it * 2, it * 2 + 2).toInt(16).toByte() }
 
         val s = sock ?: error("Pairing nicht gestartet")
@@ -63,7 +66,7 @@ class Pairing(private val ctx: Context) {
             .forEach { md.update(strip(it)) }
         md.update(cb.copyOfRange(1, 3))
         val hash = md.digest()
-        check(hash[0] == cb[0]) { "Falscher Code" }
+        if (hash[0] != cb[0]) throw WrongCodeException()
 
         send(polo(40, PbWriter().bytes(1, hash)))
         receive() // SecretAck
