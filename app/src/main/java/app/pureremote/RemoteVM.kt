@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.pureremote.net.*
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -24,6 +25,7 @@ class RemoteVM(app: Application) : AndroidViewModel(app) {
     val screen = MutableStateFlow<Screen>(Screen.Devices)
     val error = MutableStateFlow<String?>(null)
     val busy = MutableStateFlow(false)
+    private var keepAlive: Job? = null
 
     init { discovery.start() }
 
@@ -37,6 +39,7 @@ class RemoteVM(app: Application) : AndroidViewModel(app) {
         try {
             client.connect(host)
             screen.value = Screen.Remote(name)
+            keepConnected(host)
         } catch (e: Exception) {
             // Kopplung evtl. am TV gelöscht -> neu koppeln
             prefs.edit().remove("paired:$host").apply()
@@ -62,12 +65,44 @@ class RemoteVM(app: Application) : AndroidViewModel(app) {
             delay(500)
             client.connect(host)
             screen.value = Screen.Remote(name)
+            keepConnected(host)
         } catch (e: Exception) {
             error.value = e.message ?: "Fehler beim Koppeln"
         } finally { busy.value = false }
     }
 
-    fun disconnect() { client.close(); pairing.close(); screen.value = Screen.Devices }
+    /** Baut die Verbindung automatisch wieder auf (z. B. wenn das TV aus dem Standby aufwacht). */
+    private fun keepConnected(host: String) {
+        keepAlive?.cancel()
+        keepAlive = viewModelScope.launch {
+            var wait = 2000L
+            while (true) {
+                if (!client.connected.value) {
+                    wait = if (runCatching { client.connect(host) }.isSuccess) 2000L else minOf(wait * 2, 15000L)
+                }
+                delay(wait)
+            }
+        }
+    }
+
+    /**
+     * Ein-/Ausschalten. Kennt die App den Zustand, wird nach 3,5 s geprüft, ob er sich geändert hat;
+     * falls nicht, wird zusätzlich WAKEUP bzw. SLEEP gesendet (manche Firmware reagiert nur darauf).
+     */
+    fun togglePower() = viewModelScope.launch {
+        val before = client.power.value
+        client.key(Keys.POWER)
+        if (before == PowerState.UNKNOWN) return@launch
+        delay(3500)
+        if (client.connected.value && client.power.value == before) {
+            client.key(if (before == PowerState.STANDBY) Keys.WAKEUP else Keys.SLEEP)
+        }
+    }
+
+    fun disconnect() {
+        keepAlive?.cancel(); keepAlive = null
+        client.close(); pairing.close(); screen.value = Screen.Devices
+    }
 
     override fun onCleared() { discovery.stop(); client.close(); pairing.close() }
 }

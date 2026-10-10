@@ -13,7 +13,11 @@ object Keys {
     const val PLAY_PAUSE = 85; const val POWER = 26
     const val VOL_UP = 24; const val VOL_DOWN = 25; const val MUTE = 164
     const val REWIND = 89; const val FORWARD = 90
+    const val SLEEP = 223; const val WAKEUP = 224
 }
+
+/** Zustand des Fernsehers, wie ihn das TV selbst meldet. UNKNOWN = noch keine Meldung / nicht verbunden. */
+enum class PowerState { ON, STANDBY, UNKNOWN }
 
 class RemoteClient(private val ctx: Context) {
     private var sock: SSLSocket? = null
@@ -22,6 +26,7 @@ class RemoteClient(private val ctx: Context) {
     // Einzelner Schreib-Thread, damit Tastendrücke in der richtigen Reihenfolge ankommen
     private val writeScope = CoroutineScope(SupervisorJob() + Executors.newSingleThreadExecutor().asCoroutineDispatcher())
     val connected = MutableStateFlow(false)
+    val power = MutableStateFlow(PowerState.UNKNOWN)
 
     suspend fun connect(host: String) = withContext(Dispatchers.IO) {
         close()
@@ -33,12 +38,16 @@ class RemoteClient(private val ctx: Context) {
         sock = s
         // Das TV sendet zuerst "configure". Schlägt das fehl, ist das Gerät nicht (mehr) gekoppelt.
         handle(PbMsg.parse(s.inputStream.readFrame()))
-        s.soTimeout = 0
+        // Das TV sendet regelmäßig Pings. Bleibt es länger still, gilt die Verbindung als tot.
+        s.soTimeout = 45000
         connected.value = true
         reader = readScope.launch {
             try { while (isActive) handle(PbMsg.parse(s.inputStream.readFrame())) }
             catch (_: Exception) { }
-            finally { connected.value = false }
+            finally {
+                // Nur zurücksetzen, wenn dies noch die aktuelle Verbindung ist (nicht eine neu aufgebaute)
+                if (sock === s) { connected.value = false; power.value = PowerState.UNKNOWN }
+            }
         }
     }
 
@@ -51,6 +60,8 @@ class RemoteClient(private val ctx: Context) {
             m.has(1) -> write(PbWriter().msg(1, PbWriter().int(1, 622).msg(2, deviceInfo())))   // configure
             m.has(2) -> write(PbWriter().msg(2, PbWriter().int(1, 622)))                          // set_active
             m.has(8) -> write(PbWriter().msg(9, PbWriter().int(1, m.msg(8)?.int(1) ?: 0)))        // ping -> pong
+            m.has(40) -> power.value =                                                            // remote_start
+                if ((m.msg(40)?.int(1) ?: 0) != 0) PowerState.ON else PowerState.STANDBY
         }
     }
 
@@ -71,5 +82,6 @@ class RemoteClient(private val ctx: Context) {
         reader?.cancel(); reader = null
         runCatching { sock?.close() }; sock = null
         connected.value = false
+        power.value = PowerState.UNKNOWN
     }
 }

@@ -5,10 +5,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
@@ -18,6 +20,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -26,6 +29,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.pureremote.net.Keys
+import app.pureremote.net.PowerState
 
 class MainActivity : ComponentActivity() {
     private val vm: RemoteVM by viewModels()
@@ -102,6 +106,7 @@ fun CodeEntry(vm: RemoteVM, s: Screen.Code) {
 @Composable
 fun RemotePad(vm: RemoteVM, s: Screen.Remote) {
     val connected by vm.client.connected.collectAsStateWithLifecycle()
+    val power by vm.client.power.collectAsStateWithLifecycle()
     val haptic = LocalHapticFeedback.current
     fun press(code: Int) { haptic.performHapticFeedback(HapticFeedbackType.LongPress); vm.client.key(code) }
 
@@ -115,13 +120,31 @@ fun RemotePad(vm: RemoteVM, s: Screen.Remote) {
             Icon(icon, desc, Modifier.size(32.dp))
         }
 
+    val (statusText, statusColor) = when {
+        !connected -> "Nicht erreichbar – verbinde neu …" to MaterialTheme.colorScheme.error
+        power == PowerState.ON -> "An" to Color(0xFF2E7D32)
+        power == PowerState.STANDBY -> "Standby" to Color(0xFFF9A825)
+        else -> "Verbunden" to MaterialTheme.colorScheme.outline
+    }
+    val powerLabel = when {
+        connected && power == PowerState.ON -> "⏻ Ausschalten"
+        connected && power == PowerState.STANDBY -> "⏻ Einschalten"
+        else -> "⏻ Power"
+    }
+
     Row(verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(s.name, style = MaterialTheme.typography.titleMedium)
-            Text(if (connected) "verbunden" else "getrennt", color = if (connected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(10.dp).background(statusColor, CircleShape))
+                Spacer(Modifier.width(6.dp))
+                Text(statusText, color = statusColor, style = MaterialTheme.typography.bodyMedium)
+            }
         }
-        if (!connected) TextButton(onClick = { vm.disconnect() }) { Text("Neu verbinden") }
-        TextButton(onClick = { press(Keys.POWER) }) { Text("⏻ Power") }
+        TextButton(onClick = {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            vm.togglePower()
+        }) { Text(powerLabel) }
         TextButton(onClick = { vm.disconnect() }) { Text("Trennen") }
     }
     Spacer(Modifier.height(24.dp))
