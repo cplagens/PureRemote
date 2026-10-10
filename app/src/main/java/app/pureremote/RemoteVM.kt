@@ -1,50 +1,80 @@
 package app.pureremote
 
 import android.app.Application
+import android.view.KeyEvent
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.pureremote.net.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 sealed interface Screen {
     data object Devices : Screen
     data class Code(val host: String, val name: String) : Screen
-    data class Remote(val name: String) : Screen
+    data class Remote(val name: String, val host: String) : Screen
 }
+
+/** Eine Zeile der Geräteliste: gespeicherte und/oder aktuell im WLAN sichtbare Fernseher. */
+data class DeviceRow(val host: String, val name: String, val online: Boolean, val saved: Boolean)
 
 class RemoteVM(app: Application) : AndroidViewModel(app) {
     private val discovery = Discovery(app)
-    val devices = discovery.devices
+    private val store = Store(app)
     val client = RemoteClient(app)
     private val pairing = Pairing(app)
-    private val prefs = app.getSharedPreferences("pureremote", 0)
+
+    private val savedDevices = MutableStateFlow(store.devices())
+    val deviceRows: StateFlow<List<DeviceRow>> = combine(discovery.devices, savedDevices) { found, saved ->
+        saved.map { s -> DeviceRow(s.host, s.name, online = found.any { it.host == s.host }, saved = true) } +
+            found.filter { f -> saved.none { it.host == f.host } }.map { DeviceRow(it.host, it.name, online = true, saved = false) }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val screen = MutableStateFlow<Screen>(Screen.Devices)
     val error = MutableStateFlow<String?>(null)
     val busy = MutableStateFlow(false)
+    val connectingTo = MutableStateFlow<String?>(null)
+    val shortcuts = MutableStateFlow(store.shortcuts())
+    val volumeKeys = MutableStateFlow(store.volumeKeys)
     private var keepAlive: Job? = null
 
-    init { discovery.start() }
+    init {
+        discovery.start()
+        // Beim Start direkt mit dem zuletzt genutzten (oder einzigen gekoppelten) Fernseher verbinden
+        val target = store.lastHost ?: store.pairedHosts().singleOrNull()
+        if (target != null && store.isPaired(target)) {
+            select(target, savedDevices.value.firstOrNull { it.host == target }?.name ?: target)
+        }
+    }
+
+    // ---------------- Verbinden / Koppeln ----------------
 
     fun select(host: String, name: String) = viewModelScope.launch {
         error.value = null
-        if (prefs.getBoolean("paired:$host", false)) connect(host, name) else startPairing(host, name)
+        if (store.isPaired(host)) connect(host, name) else startPairing(host, name)
     }
 
     private suspend fun connect(host: String, name: String) {
-        busy.value = true
+        busy.value = true; connectingTo.value = name
         try {
             client.connect(host)
-            screen.value = Screen.Remote(name)
-            keepConnected(host)
+            onConnected(host, name)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: UnreachableException) {
+            // Nur nicht erreichbar -> Kopplung bleibt erhalten
+            error.value = "$name ist nicht erreichbar. Ist der Fernseher an und im selben WLAN?"
         } catch (e: Exception) {
             // Kopplung evtl. am TV gelöscht -> neu koppeln
-            prefs.edit().remove("paired:$host").apply()
+            store.setPaired(host, false)
             startPairing(host, name)
-        } finally { busy.value = false }
+        } finally { busy.value = false; connectingTo.value = null }
     }
 
     private suspend fun startPairing(host: String, name: String) {
@@ -52,6 +82,8 @@ class RemoteVM(app: Application) : AndroidViewModel(app) {
         try {
             pairing.start(host)
             screen.value = Screen.Code(host, name)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             error.value = "Verbindung fehlgeschlagen: ${e.message}"
         } finally { busy.value = false }
@@ -61,14 +93,27 @@ class RemoteVM(app: Application) : AndroidViewModel(app) {
         busy.value = true; error.value = null
         try {
             pairing.finish(code)
-            prefs.edit().putBoolean("paired:$host", true).apply()
+            store.setPaired(host, true)
             delay(500)
             client.connect(host)
-            screen.value = Screen.Remote(name)
-            keepConnected(host)
+            onConnected(host, name)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             error.value = e.message ?: "Fehler beim Koppeln"
         } finally { busy.value = false }
+    }
+
+    private fun onConnected(host: String, name: String) {
+        // Eigener Name > im WLAN gefundener Name > übergebener Name (bei manueller IP = die IP)
+        val shown = savedDevices.value.firstOrNull { it.host == host }?.name?.takeIf { it != host }
+            ?: discovery.devices.value.firstOrNull { it.host == host }?.name
+            ?: name
+        store.saveDevice(host, shown)
+        savedDevices.value = store.devices()
+        store.lastHost = host
+        screen.value = Screen.Remote(shown, host)
+        keepConnected(host)
     }
 
     /** Baut die Verbindung automatisch wieder auf (z. B. wenn das TV aus dem Standby aufwacht). */
@@ -85,6 +130,25 @@ class RemoteVM(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun disconnect() {
+        keepAlive?.cancel(); keepAlive = null
+        client.close(); pairing.close(); screen.value = Screen.Devices
+    }
+
+    // ---------------- Geräte verwalten ----------------
+
+    fun rename(host: String, newName: String) {
+        store.saveDevice(host, newName)
+        savedDevices.value = store.devices()
+    }
+
+    fun forget(host: String) {
+        store.forget(host)
+        savedDevices.value = store.devices()
+    }
+
+    // ---------------- Steuern ----------------
+
     /**
      * Ein-/Ausschalten. Kennt die App den Zustand, wird nach 3,5 s geprüft, ob er sich geändert hat;
      * falls nicht, wird zusätzlich WAKEUP bzw. SLEEP gesendet (manche Firmware reagiert nur darauf).
@@ -99,9 +163,48 @@ class RemoteVM(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun disconnect() {
-        keepAlive?.cancel(); keepAlive = null
-        client.close(); pairing.close(); screen.value = Screen.Devices
+    fun sendText(text: String) = client.sendText(text)
+
+    // ---------------- Apps ----------------
+
+    fun launch(app: AppShortcut) = client.launchApp(app.target)
+
+    fun addShortcut(name: String, target: String) {
+        if (name.isBlank() || target.isBlank()) return
+        updateShortcuts(shortcuts.value + AppShortcut(name.trim(), target.trim()))
+    }
+
+    fun removeShortcut(index: Int) {
+        updateShortcuts(shortcuts.value.filterIndexed { i, _ -> i != index })
+    }
+
+    fun moveShortcutUp(index: Int) {
+        if (index <= 0 || index >= shortcuts.value.size) return
+        val l = shortcuts.value.toMutableList()
+        l.add(index - 1, l.removeAt(index))
+        updateShortcuts(l)
+    }
+
+    private fun updateShortcuts(list: List<AppShortcut>) {
+        shortcuts.value = list
+        store.saveShortcuts(list)
+    }
+
+    // ---------------- Lautstärketasten des Handys ----------------
+
+    fun setVolumeKeys(on: Boolean) { volumeKeys.value = on; store.volumeKeys = on }
+
+    fun volumeKeyActive() = volumeKeys.value && screen.value is Screen.Remote && client.connected.value
+
+    /** Gibt true zurück, wenn die Taste an den Fernseher geschickt (und damit verbraucht) wurde. */
+    fun handleVolumeKey(keyCode: Int, repeatCount: Int): Boolean {
+        if (keyCode != KeyEvent.KEYCODE_VOLUME_UP && keyCode != KeyEvent.KEYCODE_VOLUME_DOWN) return false
+        if (!volumeKeyActive()) return false
+        // Beim Gedrückthalten nicht jeden System-Repeat weitergeben
+        if (repeatCount == 0 || repeatCount % 3 == 0) {
+            client.key(if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) Keys.VOL_UP else Keys.VOL_DOWN)
+        }
+        return true
     }
 
     override fun onCleared() { discovery.stop(); client.close(); pairing.close() }

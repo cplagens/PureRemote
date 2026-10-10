@@ -21,6 +21,14 @@ Android-Fernbedienung für Chromecast mit Google TV (Android TV Remote Protocol 
 
 Hinweis: Das Protokoll ist nicht offiziell dokumentiert und kann sich mit Firmware-Updates ändern.
 
+## Funktionen
+- Verbindet sich beim Start automatisch mit dem zuletzt genutzten Fernseher; Geräte lassen sich umbenennen.
+- Anzeige, ob das Google TV an ist oder im Standby, mit automatischem Wiederverbinden.
+- Pfeil- und Lautstärketasten wiederholen sich, solange man sie gedrückt hält.
+- Die Lautstärketasten des Handys steuern den Fernseher (im Menü abschaltbar).
+- Texteingabe vom Handy in Suchfelder des Fernsehers.
+- App-Schnellstart mit eigener, anpassbarer Liste.
+
 ## Unterstützen
 PureRemote ist und bleibt kostenlos, ohne Werbung und ohne Tracking. Wer möchte, kann die Entwicklung freiwillig unterstützen.
 Die Links werden in `app/src/main/java/app/pureremote/SupportLinks.kt` eingetragen; leere Einträge werden in der App ausgeblendet.

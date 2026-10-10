@@ -31,6 +31,7 @@ class PbMsg private constructor(private val f: Map<Int, List<Any>>) {
     fun int(n: Int): Int? = (f[n]?.firstOrNull() as? Long)?.toInt()
     fun bytes(n: Int): ByteArray? = f[n]?.firstOrNull() as? ByteArray
     fun msg(n: Int): PbMsg? = bytes(n)?.let { parse(it) }
+    fun string(n: Int): String? = bytes(n)?.toString(Charsets.UTF_8)
 
     companion object {
         fun parse(d: ByteArray): PbMsg {

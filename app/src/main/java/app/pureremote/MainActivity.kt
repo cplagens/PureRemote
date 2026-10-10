@@ -1,6 +1,7 @@
 package app.pureremote
 
 import android.os.Bundle
+import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -37,6 +38,14 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent { MaterialTheme { Surface(Modifier.fillMaxSize()) { App(vm) } } }
     }
+
+    // Die Lautstärketasten des Handys steuern den Fernseher, solange die Fernbedienung verbunden ist
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean =
+        vm.handleVolumeKey(keyCode, event.repeatCount) || super.onKeyDown(keyCode, event)
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean =
+        if ((keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) && vm.volumeKeyActive()) true
+        else super.onKeyUp(keyCode, event)
 }
 
 @Composable
@@ -57,9 +66,11 @@ fun App(vm: RemoteVM) {
 
 @Composable
 fun Devices(vm: RemoteVM) {
-    val devices by vm.devices.collectAsStateWithLifecycle()
+    val rows by vm.deviceRows.collectAsStateWithLifecycle()
+    val connectingTo by vm.connectingTo.collectAsStateWithLifecycle()
     var manualIp by remember { mutableStateOf("") }
     var showAbout by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<DeviceRow?>(null) }
     Column(Modifier.fillMaxSize()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Image(painterResource(R.drawable.ic_logo), contentDescription = null, modifier = Modifier.size(36.dp))
@@ -68,13 +79,25 @@ fun Devices(vm: RemoteVM) {
             IconButton(onClick = { showAbout = true }) { Icon(Icons.Default.Info, contentDescription = "Über PureRemote") }
         }
         if (showAbout) AboutDialog { showAbout = false }
-        Text("Geräte im WLAN:", Modifier.padding(top = 12.dp, bottom = 4.dp))
-        if (devices.isEmpty()) Text("Suche läuft …", color = MaterialTheme.colorScheme.outline)
+        editing?.let { r ->
+            RenameDialog(
+                row = r,
+                onSave = { vm.rename(r.host, it); editing = null },
+                onForget = { vm.forget(r.host); editing = null },
+                onDismiss = { editing = null }
+            )
+        }
+        connectingTo?.let { Text("Verbinde mit $it …", color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 8.dp)) }
+        Text("Fernseher:", Modifier.padding(top = 12.dp, bottom = 4.dp))
+        if (rows.isEmpty()) Text("Suche läuft …", color = MaterialTheme.colorScheme.outline)
         LazyColumn(Modifier.weight(1f)) {
-            items(devices) { d ->
+            items(rows, key = { it.host }) { d ->
                 ListItem(
                     headlineContent = { Text(d.name) },
-                    supportingContent = { Text(d.host) },
+                    supportingContent = { Text(if (d.online) d.host else "${d.host} · gerade nicht sichtbar") },
+                    trailingContent = {
+                        IconButton(onClick = { editing = d }) { Icon(Icons.Default.Edit, contentDescription = "Umbenennen") }
+                    },
                     modifier = Modifier.clickable { vm.select(d.host, d.name) }
                 )
                 HorizontalDivider()
@@ -100,79 +123,6 @@ fun CodeEntry(vm: RemoteVM, s: Screen.Code) {
     Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Button(onClick = { vm.submitCode(s.host, s.name, code) }, enabled = code.length == 6) { Text("Koppeln") }
         TextButton(onClick = { vm.disconnect() }) { Text("Abbrechen") }
-    }
-}
-
-@Composable
-fun RemotePad(vm: RemoteVM, s: Screen.Remote) {
-    val connected by vm.client.connected.collectAsStateWithLifecycle()
-    val power by vm.client.power.collectAsStateWithLifecycle()
-    val haptic = LocalHapticFeedback.current
-    fun press(code: Int) { haptic.performHapticFeedback(HapticFeedbackType.LongPress); vm.client.key(code) }
-
-    @Composable
-    fun Btn(label: String, code: Int, mod: Modifier = Modifier.size(72.dp)) =
-        FilledTonalButton(onClick = { press(code) }, modifier = mod, contentPadding = PaddingValues(0.dp)) { Text(label) }
-
-    @Composable
-    fun IconBtn(icon: androidx.compose.ui.graphics.vector.ImageVector, desc: String, code: Int) =
-        FilledTonalButton(onClick = { press(code) }, modifier = Modifier.size(72.dp), contentPadding = PaddingValues(0.dp)) {
-            Icon(icon, desc, Modifier.size(32.dp))
-        }
-
-    val (statusText, statusColor) = when {
-        !connected -> "Nicht erreichbar – verbinde neu …" to MaterialTheme.colorScheme.error
-        power == PowerState.ON -> "An" to Color(0xFF2E7D32)
-        power == PowerState.STANDBY -> "Standby" to Color(0xFFF9A825)
-        else -> "Verbunden" to MaterialTheme.colorScheme.outline
-    }
-    val powerLabel = when {
-        connected && power == PowerState.ON -> "⏻ Ausschalten"
-        connected && power == PowerState.STANDBY -> "⏻ Einschalten"
-        else -> "⏻ Power"
-    }
-
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Text(s.name, style = MaterialTheme.typography.titleMedium)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(10.dp).background(statusColor, CircleShape))
-                Spacer(Modifier.width(6.dp))
-                Text(statusText, color = statusColor, style = MaterialTheme.typography.bodyMedium)
-            }
-        }
-        TextButton(onClick = {
-            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-            vm.togglePower()
-        }) { Text(powerLabel) }
-        TextButton(onClick = { vm.disconnect() }) { Text("Trennen") }
-    }
-    Spacer(Modifier.height(24.dp))
-
-    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        IconBtn(Icons.Default.KeyboardArrowUp, "Hoch", Keys.UP)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconBtn(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Links", Keys.LEFT)
-            Btn("OK", Keys.CENTER, Modifier.size(88.dp))
-            IconBtn(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Rechts", Keys.RIGHT)
-        }
-        IconBtn(Icons.Default.KeyboardArrowDown, "Runter", Keys.DOWN)
-        Spacer(Modifier.height(16.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            IconBtn(Icons.AutoMirrored.Filled.ArrowBack, "Zurück", Keys.BACK)
-            IconBtn(Icons.Default.Home, "Home", Keys.HOME)
-            IconBtn(Icons.Default.Menu, "Menü", Keys.MENU)
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Btn("⏪", Keys.REWIND)
-            IconBtn(Icons.Default.PlayArrow, "Play/Pause", Keys.PLAY_PAUSE)
-            Btn("⏩", Keys.FORWARD)
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Btn("Vol −", Keys.VOL_DOWN)
-            Btn("Mute", Keys.MUTE)
-            Btn("Vol +", Keys.VOL_UP)
-        }
     }
 }
 
