@@ -14,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -75,6 +76,14 @@ fun KeyButton(
     }
 }
 
+/** Doppelpfeil für Vor-/Zurückspulen in der Tastenfarbe (die Emoji ⏪/⏩ zeichnet das System farbig). */
+@Composable
+private fun SeekIcon(forward: Boolean) {
+    Row(Modifier.scale(scaleX = if (forward) 1f else -1f, scaleY = 1f), horizontalArrangement = Arrangement.spacedBy((-12).dp)) {
+        repeat(2) { Icon(Icons.Default.PlayArrow, null, Modifier.size(28.dp)) }
+    }
+}
+
 @Composable
 private fun RemoteKey(vm: RemoteVM, code: Int, desc: String, size: Dp, repeat: Boolean = false, content: @Composable () -> Unit) {
     KeyButton(desc, Modifier.size(size), repeat, onKey = { vm.client.key(code) }, content = content)
@@ -89,6 +98,7 @@ fun RemotePad(vm: RemoteVM, s: Screen.Remote) {
     var showText by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
+    var showAbout by remember { mutableStateOf(false) }
 
     val (statusText, statusColor) = when {
         !connected -> stringResource(R.string.status_offline) to MaterialTheme.colorScheme.error
@@ -105,6 +115,7 @@ fun RemotePad(vm: RemoteVM, s: Screen.Remote) {
     if (showApps) AppsDialog(vm) { showApps = false }
     if (showText) TextDialog(vm) { showText = false }
     if (showSettings) SettingsDialog(vm) { showSettings = false }
+    if (showAbout) AboutDialog { showAbout = false }
 
     Column(Modifier.fillMaxSize()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -130,6 +141,10 @@ fun RemotePad(vm: RemoteVM, s: Screen.Remote) {
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.switch_device)) },
                         onClick = { menuOpen = false; vm.disconnect() }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.about)) },
+                        onClick = { menuOpen = false; showAbout = true }
                     )
                 }
             }
@@ -159,9 +174,9 @@ fun RemotePad(vm: RemoteVM, s: Screen.Remote) {
                     RemoteKey(vm, Keys.MENU, stringResource(R.string.key_menu), d) { Icon(Icons.Default.Menu, null, Modifier.size(32.dp)) }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    RemoteKey(vm, Keys.REWIND, stringResource(R.string.key_rewind), d) { Text("⏪") }
+                    RemoteKey(vm, Keys.REWIND, stringResource(R.string.key_rewind), d) { SeekIcon(forward = false) }
                     RemoteKey(vm, Keys.PLAY_PAUSE, stringResource(R.string.key_play_pause), d) { Icon(Icons.Default.PlayArrow, null, Modifier.size(32.dp)) }
-                    RemoteKey(vm, Keys.FORWARD, stringResource(R.string.key_forward), d) { Text("⏩") }
+                    RemoteKey(vm, Keys.FORWARD, stringResource(R.string.key_forward), d) { SeekIcon(forward = true) }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     RemoteKey(vm, Keys.VOL_DOWN, stringResource(R.string.key_vol_down), d, repeat = true) { Text("Vol −") }

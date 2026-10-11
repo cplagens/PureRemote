@@ -31,6 +31,17 @@ class RemoteClient(private val ctx: Context) {
     private companion object {
         // PING | KEY | IME | POWER | VOLUME | APP_LINK (Sprachsteuerung wird nicht unterstützt)
         const val FEATURES = 1 or 2 or 4 or 32 or 64 or 512
+
+        // Manche Geräte (z. B. Chromecast mit Google TV) lehnen "market://launch?id=" ab.
+        // Für bekannte Apps wird deshalb deren eigener Link verwendet.
+        val APP_LINKS = mapOf(
+            "com.google.android.youtube.tv" to "https://www.youtube.com",
+            "com.netflix.ninja" to "https://www.netflix.com/title",
+            "com.amazon.amazonvideo.livingroom" to "https://app.primevideo.com",
+            "com.disney.disneyplus" to "https://www.disneyplus.com",
+            "com.spotify.tv.android" to "spotify://",
+            "com.plexapp.android" to "plex://",
+        )
     }
 
     private var sock: SSLSocket? = null
@@ -130,7 +141,7 @@ class RemoteClient(private val ctx: Context) {
 
     /** Startet eine App. [target] ist ein Link (z. B. https://…) oder ein Paketname (com.netflix.ninja). */
     fun launchApp(target: String) {
-        val link = if (target.contains("://")) target else "market://launch?id=$target"
+        val link = if (target.contains("://")) target else APP_LINKS[target] ?: "market://launch?id=$target"
         send(PbWriter().msg(90, PbWriter().string(1, link)))
     }
 

@@ -68,7 +68,7 @@ class Store(ctx: Context) {
         s.lines().mapNotNull { line -> line.split('\t').takeIf { it.size == 2 }?.let { it[0] to it[1] } }
 
     companion object {
-        // Paketnamen der Android-TV-Versionen; "market://launch?id=" startet die App, falls installiert.
+        // Paketnamen der Android-TV-Versionen; RemoteClient.launchApp macht daraus den passenden Link.
         val DEFAULT_APPS = listOf(
             AppShortcut("YouTube", "com.google.android.youtube.tv"),
             AppShortcut("Netflix", "com.netflix.ninja"),

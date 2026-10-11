@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/logo.svg" width="108" alt="PureRemote Logo"></p>
+
 # PureRemote
 
 Open-source remote for Google TV. Ad-free &amp; privacy-friendly.
