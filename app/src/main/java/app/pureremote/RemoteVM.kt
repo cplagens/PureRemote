@@ -176,6 +176,13 @@ class RemoteVM(app: Application) : AndroidViewModel(app) {
 
     fun launch(app: AppShortcut) = client.launchApp(app.target)
 
+    /** Öffnet das Google-TV-Dashboard mit den Einstellungen: langer Druck auf Home (KEYCODE_SETTINGS deuten manche Geräte anders). */
+    fun openTvSettings() = viewModelScope.launch {
+        client.key(Keys.HOME, 1)
+        delay(800)
+        client.key(Keys.HOME, 2)
+    }
+
     fun addShortcut(name: String, target: String) {
         if (name.isBlank() || target.isBlank()) return
         updateShortcuts(shortcuts.value + AppShortcut(name.trim(), target.trim()))

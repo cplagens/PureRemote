@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -171,7 +172,7 @@ fun RemotePad(vm: RemoteVM, s: Screen.Remote) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     RemoteKey(vm, Keys.BACK, stringResource(R.string.key_back), d) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, Modifier.size(32.dp)) }
                     RemoteKey(vm, Keys.HOME, stringResource(R.string.key_home), d) { Icon(Icons.Default.Home, null, Modifier.size(32.dp)) }
-                    RemoteKey(vm, Keys.MENU, stringResource(R.string.key_menu), d) { Icon(Icons.Default.Menu, null, Modifier.size(32.dp)) }
+                    KeyButton(stringResource(R.string.settings), Modifier.size(d), onKey = { vm.openTvSettings() }) { Icon(Icons.Default.Settings, null, Modifier.size(32.dp)) }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     RemoteKey(vm, Keys.REWIND, stringResource(R.string.key_rewind), d) { SeekIcon(forward = false) }
@@ -179,9 +180,9 @@ fun RemotePad(vm: RemoteVM, s: Screen.Remote) {
                     RemoteKey(vm, Keys.FORWARD, stringResource(R.string.key_forward), d) { SeekIcon(forward = true) }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    RemoteKey(vm, Keys.VOL_DOWN, stringResource(R.string.key_vol_down), d, repeat = true) { Text("Vol −") }
-                    RemoteKey(vm, Keys.MUTE, stringResource(R.string.key_mute), d) { Text("Mute") }
-                    RemoteKey(vm, Keys.VOL_UP, stringResource(R.string.key_vol_up), d, repeat = true) { Text("Vol +") }
+                    RemoteKey(vm, Keys.VOL_DOWN, stringResource(R.string.key_vol_down), d, repeat = true) { Icon(painterResource(R.drawable.ic_volume_down), null, Modifier.size(32.dp)) }
+                    RemoteKey(vm, Keys.MUTE, stringResource(R.string.key_mute), d) { Icon(painterResource(R.drawable.ic_volume_off), null, Modifier.size(32.dp)) }
+                    RemoteKey(vm, Keys.VOL_UP, stringResource(R.string.key_vol_up), d, repeat = true) { Icon(painterResource(R.drawable.ic_volume_up), null, Modifier.size(32.dp)) }
                 }
                 Spacer(Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
