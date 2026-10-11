@@ -35,13 +35,19 @@ class MainActivity : AppCompatActivity() {
         setContent { MaterialTheme { Surface(Modifier.fillMaxSize()) { App(vm) } } }
     }
 
-    // Die Lautstärketasten des Handys steuern den Fernseher, solange die Fernbedienung verbunden ist
-    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean =
-        vm.handleVolumeKey(keyCode, event.repeatCount) || super.onKeyDown(keyCode, event)
-
-    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean =
-        if ((keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) && vm.volumeKeyActive()) true
-        else super.onKeyUp(keyCode, event)
+    // Die Lautstärketasten des Handys steuern den Fernseher, solange die Fernbedienung verbunden ist.
+    // dispatchKeyEvent fängt die Tasten zuverlässig vor Compose und dem System-Lautstärkeregler ab.
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.keyCode == KeyEvent.KEYCODE_VOLUME_UP || event.keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+            if (vm.volumeKeyActive()) {
+                if (event.action == KeyEvent.ACTION_DOWN) {
+                    vm.handleVolumeKey(event.keyCode, event.repeatCount)
+                }
+                return true
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
 }
 
 @Composable

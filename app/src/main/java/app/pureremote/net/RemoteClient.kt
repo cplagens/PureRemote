@@ -24,6 +24,9 @@ enum class PowerState { ON, STANDBY, UNKNOWN }
 /** Die aktuell im Vordergrund laufende App auf dem TV. */
 data class AppInfo(val label: String, val pkg: String)
 
+/** Lautstärke-Informationen, sofern das TV diese über das Protokoll meldet. */
+data class VolumeInfo(val level: Int, val max: Int, val muted: Boolean)
+
 /** Das TV ist per TCP nicht erreichbar (aus, anderes Netz, ...) - im Gegensatz zu "nicht gekoppelt". */
 class UnreachableException(cause: Throwable) : IOException(cause)
 
@@ -53,6 +56,7 @@ class RemoteClient(private val ctx: Context) {
     val connected = MutableStateFlow(false)
     val power = MutableStateFlow(PowerState.UNKNOWN)
     val currentApp = MutableStateFlow<AppInfo?>(null)
+    val volumeInfo = MutableStateFlow<VolumeInfo?>(null)
 
     @Volatile private var activeFeatures = FEATURES
     @Volatile private var imeCounter = 0
@@ -81,7 +85,7 @@ class RemoteClient(private val ctx: Context) {
             catch (_: Exception) { }
             finally {
                 // Nur zurücksetzen, wenn dies noch die aktuelle Verbindung ist (nicht eine neu aufgebaute)
-                if (sock === s) { connected.value = false; power.value = PowerState.UNKNOWN; currentApp.value = null }
+                if (sock === s) { connected.value = false; power.value = PowerState.UNKNOWN; currentApp.value = null; volumeInfo.value = null }
             }
         }
     }
@@ -112,6 +116,15 @@ class RemoteClient(private val ctx: Context) {
             }
             m.has(40) -> power.value =                                                            // remote_start
                 if ((m.msg(40)?.int(1) ?: 0) != 0) PowerState.ON else PowerState.STANDBY
+            m.has(50) -> {                                                                        // remote_set_volume_level
+                val vol = m.msg(50)
+                val max = vol?.int(6)
+                val level = vol?.int(7)
+                val muted = (vol?.int(8) ?: 0) != 0
+                if (max != null && level != null) {
+                    volumeInfo.value = VolumeInfo(level, max, muted)
+                }
+            }
         }
     }
 
@@ -151,5 +164,6 @@ class RemoteClient(private val ctx: Context) {
         connected.value = false
         power.value = PowerState.UNKNOWN
         currentApp.value = null
+        volumeInfo.value = null
     }
 }
